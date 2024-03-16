@@ -1,5 +1,6 @@
 # Quansheng UV-K5 driver (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 # Adapted For UV-K5 EGZUMER custom software By EGZUMER, JOC2
+# Further Adapted For UV-K5 Aubs custom software By AubsUK
 #
 # based on template.py Copyright 2012 Dan Smith <dsmith@danplanet.com>
 #
@@ -26,51 +27,52 @@ from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueString, \
     RadioSettings, InvalidValueError, RadioSettingSubGroup
 
+
 LOG = logging.getLogger(__name__)
+
 
 MEM_FORMAT = """
 //#seekto 0x0000;
 struct {
-  ul32 freq;
-  ul32 offset;
+    ul32 freq;
+    ul32 offset;
 
-// 0x08
-  u8 rxcode;
-  u8 txcode;
+    // 0x08
+    u8 rxcode;
+    u8 txcode;
 
-// 0x0A
-  u8 txcodeflag:4,
-  rxcodeflag:4;
+    // 0x0A
+    u8 txcodeflag:4,
+    rxcodeflag:4;
 
-// 0x0B
-  u8 modulation:4,
-  shift:4;
+    // 0x0B
+    u8 modulation:4,
+    shift:4;
 
-// 0x0C
-  u8 __UNUSED1:3,
-  bclo:1,
-  txpower:2,
-  bandwidth:1,
-  freq_reverse:1;
+    // 0x0C
+    u8 __UNUSED1:3,
+    bclo:1,
+    txpower:2,
+    bandwidth:1,
+    freq_reverse:1;
 
-  // 0x0D
-  u8 __UNUSED2:4,
-  dtmf_pttid:3,
-  dtmf_decode:1;
+    // 0x0D
+    u8 __UNUSED2:4,
+    dtmf_pttid:3,
+    dtmf_decode:1;
 
-  // 0x0E
-  u8 step;
-  u8 scrambler;
-
+    // 0x0E
+    u8 step;
+    u8 scrambler;
 } channel[214];
 
 //#seekto 0xd60;
 struct {
-u8 is_scanlist1:1,
-is_scanlist2:1,
-compander:2,
-is_free:1,
-band:3;
+    u8  UnusedBit01:1,
+        UnusedBit02:1,
+        compander:2,
+        is_free:1,
+        band:3;
 } channel_attributes[207];
 
 #seekto 0xe40;
@@ -164,13 +166,28 @@ struct {
 } dtmf;
 
 //#seekto 0xf18;
-u8 slDef;
-u8 sl1PriorEnab;
-u8 sl1PriorCh1;
-u8 sl1PriorCh2;
-u8 sl2PriorEnab;
-u8 sl2PriorCh1;
-u8 sl2PriorCh2;
+u8  DefaultScanList7:1,
+    DefaultScanList6:1,
+    DefaultScanList5:1,
+    DefaultScanList4:1,
+    DefaultScanList3:1,
+    DefaultScanList2:1,
+    DefaultScanList1:1,
+    DefaultScanList0:1;
+u8  UnusedBit03:1,
+    UnusedBit04:1,
+    UnusedBit05:1,
+    UnusedBit06:1,
+    UnusedBit07:1,
+    DefaultScanOnStart:1,
+    DefaultScanList9:1,
+    DefaultScanList8:1;
+
+u8 UnusedByte01;
+u8 UnusedByte02;
+u8 UnusedByte03;
+u8 UnusedByte04;
+u8 UnusedByte05;
 
 #seekto 0xf40;
 u8 int_flock;
@@ -192,14 +209,36 @@ u8  backlight_on_TX_RX:2,
 
 #seekto 0xf50;
 struct {
-char name[16];
+    char name[10];
+    #seek 6;  // Move to the next channel name
 } channelname[200];
+
+#seekto 0xf5e;
+struct {
+u8  ScanList7:1,
+    ScanList6:1,
+    ScanList5:1,
+    ScanList4:1,
+    ScanList3:1,
+    ScanList2:1,
+    ScanList1:1,
+    ScanList0:1;
+u8  ScanListUnused1:1,
+    ScanListUnused2:1,
+    ScanListUnused3:1,
+    ScanListUnused4:1,
+    ScanListUnused5:1,
+    LockedOut:1,
+    ScanList9:1,
+    ScanList8:1;
+    #seek 14;  // Move to the next channel data
+} channelscanlists[200];
 
 #seekto 0x1c00;
 struct {
-char name[8];
-char number[3];
-#seek 5;
+    char name[8];
+    char number[3];
+    #seek 5;
 } dtmfcontact[16];
 
 struct {
@@ -291,24 +330,42 @@ struct {
 #seekto 0x1FF0;
 struct {
 u8 ENABLE_DTMF_CALLING:1,
-   ENABLE_PWRON_PASSWORD:1,
-   ENABLE_TX1750:1,
-   ENABLE_ALARM:1,
-   ENABLE_VOX:1,
-   ENABLE_VOICE:1,
-   ENABLE_NOAA:1,
-   ENABLE_FMRADIO:1;
+    ENABLE_PWRON_PASSWORD:1,
+    ENABLE_TX1750:1,
+    ENABLE_ALARM:1,
+    ENABLE_VOX:1,
+    ENABLE_VOICE:1,
+    ENABLE_NOAA:1,
+    ENABLE_FMRADIO:1;
 u8 __UNUSED:2,
-   ENABLE_SPECTRUM:1,
-   ENABLE_AM_FIX:1,
-   ENABLE_BLMIN_TMP_OFF:1,
-   ENABLE_RAW_DEMODULATORS:1,
-   ENABLE_WIDE_RX:1,
-   ENABLE_FLASHLIGHT:1;
+    ENABLE_SPECTRUM:1,
+    ENABLE_AM_FIX:1,
+    ENABLE_BLMIN_TMP_OFF:1,
+    ENABLE_RAW_DEMODULATORS:1,
+    ENABLE_WIDE_RX:1,
+    ENABLE_FLASHLIGHT:1;
 } BUILD_OPTIONS;
 
 """
 
+
+# bits that we will save from the channel structure (mostly unknown)
+SAVE_MASK_0A = 0b11001100
+SAVE_MASK_0B = 0b11101100
+SAVE_MASK_0C = 0b11100000
+SAVE_MASK_0D = 0b11111000
+SAVE_MASK_0E = 0b11110001
+SAVE_MASK_0F = 0b11110000
+
+# flags1
+FLAGS1_OFFSET_NONE = 0b00
+FLAGS1_OFFSET_MINUS = 0b10
+FLAGS1_OFFSET_PLUS = 0b01
+
+# Power levels (2,1,0)
+POWER_HIGH = 0b10
+POWER_MEDIUM = 0b01
+POWER_LOW = 0b00
 
 # power
 UVK5_POWER_LEVELS = [chirp_common.PowerLevel("Low",  watts=1.50),
@@ -341,14 +398,12 @@ BAT_TXT_LIST = ["None", "Voltage", "Percentage"]
 # Backlight auto mode
 BACKLIGHT_LIST = ["Off", "5s", "10s", "20s", "1min", "2min", "4min",
                   "Always On"]
-
 # Backlight LVL
 BACKLIGHT_LVL_LIST = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
-
 # Backlight _TX_RX_LIST
 BACKLIGHT_TX_RX_LIST = ["Off", "TX", "RX", "TX/RX"]
 
-# flock list extended
+# FLock list extended
 FLOCK_LIST = ["Default+ (137-174, 400-470 + Tx200, Tx350, Tx500)",
               "FCC HAM (144-148, 420-450)",
               "CE HAM (144-146, 430-440)",
@@ -397,7 +452,6 @@ BANDS_WIDE = {
         6: [470.0, 1300.0]
         }
 
-SCANLIST_SELECT_LIST = ["List 1", "List 2", "All channels"]
 
 DTMF_CHARS = "0123456789ABCD*# "
 DTMF_CHARS_ID = "0123456789ABCDabcd"
@@ -427,6 +481,8 @@ KEYACTIONS_LIST = ["None",
 MIC_GAIN_LIST = ["+1.1dB", "+4.0dB", "+8.0dB", "+12.0dB", "+15.1dB"]
 
 
+
+
 def min_max_def(value, min_val, max_val, default):
     """returns value if in bounds or default otherwise"""
     if min_val is not None and value < min_val:
@@ -434,6 +490,8 @@ def min_max_def(value, min_val, max_val, default):
     if max_val is not None and value > max_val:
         return default
     return value
+
+
 
 
 def list_def(value, lst, default):
@@ -445,13 +503,15 @@ def list_def(value, lst, default):
     return value
 
 
+
+
 @directory.register
 @directory.detected_by(uvk5.UVK5Radio)
-class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
-    """Quansheng UV-K5 (egzumer)"""
+class UVK5RadioAubs(uvk5.UVK5RadioBase):
+    """Quansheng UV-K5 (Aubs)"""
     VENDOR = "Quansheng"
     MODEL = "UV-K5"
-    VARIANT = "egzumer"
+    VARIANT = "Aubs"
     BAUD_RATE = 38400
     NEEDS_COMPAT_SERIAL = False
     FIRMWARE_VERSION = ""
@@ -461,15 +521,24 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
     _steps = [2.5, 5, 6.25, 10, 12.5, 25, 8.33, 0.01, 0.05, 0.1, 0.25, 0.5, 1,
               1.25, 9, 15, 20, 30, 50, 100, 125, 200, 250, 500]
 
+
+
+
     @classmethod
     def k5_approve_firmware(cls, firmware):
-        return firmware.startswith('EGZUMER ')
+        return firmware.startswith('AUBS ')
+
+
+
 
     def _get_bands(self):
         is_wide = self._memobj.BUILD_OPTIONS.ENABLE_WIDE_RX \
             if self._memobj is not None else True
         bands = BANDS_WIDE if is_wide else BANDS_STANDARD
         return bands
+
+
+
 
     def _find_band(self, hz):
         mhz = hz/1000000.0
@@ -478,6 +547,9 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             if rng[0] <= mhz <= rng[1]:
                 return bnd
         return False
+
+
+
 
     def _get_vfo_channel_names(self):
         """generates VFO_CHANNEL_NAMES"""
@@ -489,6 +561,9 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             names.append(name + "B")
         return names
 
+
+
+
     def _get_specials(self):
         """generates SPECIALS"""
         specials = {}
@@ -496,12 +571,16 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             specials[name] = 200 + idx
         return specials
 
+
+
+
     # Return information about this radio's features, including
     # how many memories it has, what bands it supports, etc
     def get_features(self):
         rf = super().get_features()
         rf.valid_special_chans = self._get_vfo_channel_names()
         rf.valid_modes = ["FM", "NFM", "AM", "NAM", "USB"]
+        rf.valid_skips = ["","S"]
 
         rf.valid_bands = []
         bands = self._get_bands()
@@ -515,6 +594,68 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         self._check_firmware_at_load()
         self._memobj = bitwise.parse(MEM_FORMAT, self._mmap)
 
+
+    def _get_mem_extra(self, mem, _mem):
+        # Look at the channel attributes if a memory has them
+        if mem.number <= 200:
+            _mem3 = self._memobj.channel_attributes[mem.number - 1]
+            # free memory bit
+            if _mem3.is_free > 0:
+                mem.empty = True
+
+        # Get the Scan Lists for the channel
+            _mem5 = self._memobj.channelscanlists[mem.number - 1]
+            tmpscn = ""
+            if _mem5.ScanList0 > 0: tmpscn += "0"
+            if _mem5.ScanList1 > 0: tmpscn += "1"
+            if _mem5.ScanList2 > 0: tmpscn += "2"
+            if _mem5.ScanList3 > 0: tmpscn += "3"
+            if _mem5.ScanList4 > 0: tmpscn += "4"
+            if _mem5.ScanList5 > 0: tmpscn += "5"
+            if _mem5.ScanList6 > 0: tmpscn += "6"
+            if _mem5.ScanList7 > 0: tmpscn += "7"
+            if _mem5.ScanList8 > 0: tmpscn += "8"
+            if _mem5.ScanList9 > 0: tmpscn += "9"
+
+        # Get the Skip/lockout for the channel
+            mem.skip = "S" if _mem5.LockedOut else ""
+
+        mem.extra = RadioSettingGroup("Extra", "extra")
+        # BCLO
+        is_bclo = bool(_mem.bclo > 0)
+        rs = RadioSetting("bclo", "BCLO", RadioSettingValueBoolean(is_bclo))
+        mem.extra.append(rs)
+        # Frequency reverse - whatever that means, don't see it in the manual
+        is_frev = bool(_mem.freq_reverse > 0)
+        rs = RadioSetting("frev", "FreqRev", RadioSettingValueBoolean(is_frev))
+        mem.extra.append(rs)
+        # PTTID
+        try:
+            pttid = self._pttid_list[_mem.dtmf_pttid]
+        except IndexError:
+            pttid = 0
+        rs = RadioSetting("pttid", "PTTID", RadioSettingValueList(
+            self._pttid_list, pttid))
+        mem.extra.append(rs)
+        # DTMF DECODE
+        is_dtmf = bool(_mem.dtmf_decode > 0)
+        rs = RadioSetting("dtmfdecode", _("DTMF decode"), RadioSettingValueBoolean(is_dtmf))
+        mem.extra.append(rs)
+        # Scrambler
+        if _mem.scrambler & 0x0f < len(SCRAMBLER_LIST):
+            enc = _mem.scrambler & 0x0f
+        else:
+            enc = 0
+        rs = RadioSetting("scrambler", _("Scrambler"), RadioSettingValueList(
+            SCRAMBLER_LIST, SCRAMBLER_LIST[enc]))
+        mem.extra.append(rs)
+        if mem.number <= 200:
+            rs = RadioSetting("scanlists", _("Scanlists"), RadioSettingValueString(0,10,tmpscn))
+            mem.extra.append(rs)
+
+
+
+
     def _get_mem_mode(self, _mem):
         temp_modes = self.get_features().valid_modes
         temp_modul = _mem.modulation * 2 + _mem.bandwidth
@@ -525,6 +666,9 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         elif temp_modul >= len(temp_modes):
             LOG.error('Mode %i unsupported', temp_modul)
             return "FM"
+
+
+
 
     def get_memory(self, number):
         mem = super().get_memory(number)
@@ -543,6 +687,9 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         mem.extra.append(rs)
         return mem
 
+
+
+
     def _set_mem_mode(self, _mem, mode):
         tmp_mode = self.get_features().valid_modes.index(mode)
         _mem.modulation = tmp_mode / 2
@@ -550,16 +697,121 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         if mode == "USB":
             _mem.bandwidth = 1  # narrow
 
-    def set_memory(self, mem):
-        super().set_memory(mem)
-        try:
-            number = self._get_specials()[mem.number]
-        except KeyError:
-            number = mem.number - 1
 
+
+
+    # Store details about a high-level memory to the memory map
+    # This is called when a user edits a memory in the UI
+    def set_memory(self, mem):
+        number = mem.number-1
+        # Get a low-level memory object mapped to the image
+        _mem = self._memobj.channel[number]
+        _mem4 = self._memobj
+        # empty memory
+        if mem.empty:
+            _mem.set_raw(b"\xFF" * 16)
+            if number < 200:
+                _mem2 = self._memobj.channelname[number]
+                _mem2.set_raw(b"\xFF" * 10)
+                # Compander in other models, not supported here
+                _mem4.channel_attributes[number].compander = 0
+                _mem4.channel_attributes[number].is_free = 1
+                _mem4.channel_attributes[number].band = 0x7
+            return mem
+        # clean the channel memory, restore some bits if it was used before
+        if _mem.get_raw(asbytes=False)[0] == "\xff":
+            # this was an empty memory
+            _mem.set_raw(b"\x00" * 16)
+        else:
+            # this memory wasn't empty, save some bits that we don't know the
+            # meaning of, or that we don't support yet
+            prev_0a = _mem.get_raw()[0x0a] & SAVE_MASK_0A
+            prev_0b = _mem.get_raw()[0x0b] & SAVE_MASK_0B
+            prev_0c = _mem.get_raw()[0x0c] & SAVE_MASK_0C
+            prev_0d = _mem.get_raw()[0x0d] & SAVE_MASK_0D
+            prev_0e = _mem.get_raw()[0x0e] & SAVE_MASK_0E
+            prev_0f = _mem.get_raw()[0x0f] & SAVE_MASK_0F
+            _mem.set_raw(b"\x00" * 10 +
+                         bytes([prev_0a, prev_0b, prev_0c,
+                                prev_0d, prev_0e, prev_0f]))
+        if number < 200:
+            _mem4.channel_attributes[number].compander = 0
+            _mem4.channel_attributes[number].is_free = 1
+            _mem4.channel_attributes[number].band = 0x7
+        # find band
+        band = self._find_band(mem.freq)
+        self._set_mem_mode(_mem, mem.mode)
+        # frequency/offset
+        _mem.freq = mem.freq/10
+        _mem.offset = mem.offset/10
+        if mem.duplex == "":
+            _mem.offset = 0
+            _mem.shift = 0
+        elif mem.duplex == '-':
+            _mem.shift = FLAGS1_OFFSET_MINUS
+        elif mem.duplex == '+':
+            _mem.shift = FLAGS1_OFFSET_PLUS
+        elif mem.duplex == 'off':
+            # we fake tx disable by setting the tx freq to 0 MHz
+            _mem.shift = FLAGS1_OFFSET_MINUS
+            _mem.offset = _mem.freq
+        # set band
+        if number < 200:
+            _mem4.channel_attributes[number].is_free = 0
+            _mem4.channel_attributes[number].band = band
+        # channels >200 are the 14 VFO chanells and don't have names
+        if number < 200:
+            _mem2 = self._memobj.channelname[number]
+            tag = mem.name.ljust(10) #+ "\x00"*6 NO NEED to do this now as we're only using 10 bytes and the remaining are used elsewhere
+            _mem2.name = tag  # Store the alpha tag
+        # tone data
+        self._set_tone(mem, _mem)
+        # step
+        _mem.step = self._steps.index(mem.tuning_step)
+        # tx power
+        if str(mem.power) == str(UVK5_POWER_LEVELS[2]):
+            _mem.txpower = POWER_HIGH
+        elif str(mem.power) == str(UVK5_POWER_LEVELS[1]):
+            _mem.txpower = POWER_MEDIUM
+        else:
+            _mem.txpower = POWER_LOW
+        for setting in mem.extra:
+            sname = setting.get_name()
+            svalue = setting.value.get_value()
+            if sname == "bclo":
+                _mem.bclo = svalue and 1 or 0
+            if sname == "pttid":
+                _mem.dtmf_pttid = self._pttid_list.index(svalue)
+            if sname == "frev":
+                _mem.freq_reverse = svalue and 1 or 0
+            if sname == "dtmfdecode":
+                _mem.dtmf_decode = svalue and 1 or 0
+            if sname == "scrambler":
+                _mem.scrambler = (
+                    _mem.scrambler & 0xf0) | SCRAMBLER_LIST.index(svalue)
         if number < 200 and 'compander' in mem.extra:
             self._memobj.channel_attributes[number].compander = (
                 COMPANDER_LIST.index(str(mem.extra['compander'].value)))
+        # Save the Scan Lists for the channel
+        if number < 200 and 'scanlists' in mem.extra:
+            _mem6a = self._memobj.channelscanlists[number]
+            _mem6b = mem.extra['scanlists'].value
+            _mem6a.ScanList7 = True if "7" in _mem6b else False
+            _mem6a.ScanList6 = True if "6" in _mem6b else False
+            _mem6a.ScanList5 = True if "5" in _mem6b else False
+            _mem6a.ScanList4 = True if "4" in _mem6b else False
+            _mem6a.ScanList3 = True if "3" in _mem6b else False
+            _mem6a.ScanList2 = True if "2" in _mem6b else False
+            _mem6a.ScanList1 = True if "1" in _mem6b else False
+            _mem6a.ScanList0 = True if "0" in _mem6b else False
+            _mem6a.ScanList9 = True if "9" in _mem6b else False
+            _mem6a.ScanList8 = True if "8" in _mem6b else False
+        # Save the Skip/lockout for the channel
+            _mem6a.LockedOut = True if mem.skip == "S" else False
+        return mem
+
+
+
 
     def set_settings(self, settings):
         _mem = self._memobj
@@ -652,6 +904,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             # Backlight TX_RX
             elif elname == "backlight_on_TX_RX":
                 _mem.backlight_on_TX_RX = element.value
+
             # AM_fix
             elif elname == "AM_fix":
                 _mem.AM_fix = element.value
@@ -763,6 +1016,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             # battery type
             elif elname == "Battery_type":
                 _mem.Battery_type = element.value
+
             # fm radio
             for i in range(1, 21):
                 freqname = "FM_%i" % i
@@ -849,26 +1103,20 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
                     k = str(element.value).rstrip("\x20\xff\x00") + "\xff" * 3
                     _mem.dtmfcontact[i-1].number = k[0:3]
 
-            # scanlist stuff
-            if elname == "slDef":
-                _mem.slDef = element.value
+            # scanlist
+            if   elname == "DefaultScanList0": _mem.DefaultScanList0 = element.value
+            elif elname == "DefaultScanList1": _mem.DefaultScanList1 = element.value
+            elif elname == "DefaultScanList2": _mem.DefaultScanList2 = element.value
+            elif elname == "DefaultScanList3": _mem.DefaultScanList3 = element.value
+            elif elname == "DefaultScanList4": _mem.DefaultScanList4 = element.value
+            elif elname == "DefaultScanList5": _mem.DefaultScanList5 = element.value
+            elif elname == "DefaultScanList6": _mem.DefaultScanList6 = element.value
+            elif elname == "DefaultScanList7": _mem.DefaultScanList7 = element.value
+            elif elname == "DefaultScanList8": _mem.DefaultScanList8 = element.value
+            elif elname == "DefaultScanList9": _mem.DefaultScanList9 = element.value
+            elif elname == "DefaultScanOnStart": _mem.DefaultScanOnStart = element.value
 
-            elif elname == "sl1PriorEnab":
-                _mem.sl1PriorEnab = element.value
-
-            elif elname == "sl2PriorEnab":
-                _mem.sl2PriorEnab = element.value
-
-            elif elname in ["sl1PriorCh1", "sl1PriorCh2", "sl2PriorCh1",
-                            "sl2PriorCh2"]:
-                val = int(element.value)
-                if val > 200 or val < 1:
-                    val = 0xff
-                else:
-                    val -= 1
-
-                _mem[elname] = val
-
+            # Keypress actions
             if elname == "key1_shortpress_action":
                 _mem.key1_shortpress_action = \
                     KEYACTIONS_LIST.index(element.value)
@@ -895,6 +1143,9 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
             elif element.changed() and elname.startswith("cal."):
                 _mem.get_path(elname).set_value(element.value)
 
+
+
+
     def get_settings(self):
         _mem = self._memobj
         basic = RadioSettingGroup("basic", "Basic Settings")
@@ -902,7 +1153,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         keya = RadioSettingGroup("keya", "Programmable Keys")
         dtmf = RadioSettingGroup("dtmf", "DTMF Settings")
         dtmfc = RadioSettingGroup("dtmfc", "DTMF Contacts")
-        scanl = RadioSettingGroup("scn", "Scan Lists")
+        scanl = RadioSettingGroup("scn", "Scan List Settings")
         unlock = RadioSettingGroup("unlock", "Unlock Settings")
         fmradio = RadioSettingGroup("fmradio", "FM Radio")
         calibration = RadioSettingGroup("calibration", "Calibration")
@@ -1037,8 +1288,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
                          "Local code (ANI ID)", val)
         ani_id_setting.set_doc('3 chars 0-9 ABCD')
 
-        tmpval = str(_mem.dtmf.up_code).upper().strip(
-                "\x00\xff\x20")
+        tmpval = str(_mem.dtmf.up_code).upper().strip("\x00\xff\x20")
         for i in tmpval:
             if i in DTMF_CHARS_UPDOWN or i == "":
                 continue
@@ -1052,8 +1302,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
                          "Up code", val)
         up_code_setting.set_doc('1-16 chars 0-9 ABCD*#')
 
-        tmpval = str(_mem.dtmf.down_code).upper().strip(
-                "\x00\xff\x20")
+        tmpval = str(_mem.dtmf.down_code).upper().strip("\x00\xff\x20")
         for i in tmpval:
             if i in DTMF_CHARS_UPDOWN:
                 continue
@@ -1115,8 +1364,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
                                          "Kill code", val)
         kill_code_setting.set_doc('5 chars 0-9 ABCD')
 
-        tmpval = str(_mem.dtmf.revive_code).upper().strip(
-                "\x00\xff\x20")
+        tmpval = str(_mem.dtmf.revive_code).upper().strip("\x00\xff\x20")
         for i in tmpval:
             if i in DTMF_CHARS_KILL:
                 continue
@@ -1158,42 +1406,43 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
 
         # ----------------- Scan Lists
 
-        tmpscanl = list_def(_mem.slDef, SCANLIST_SELECT_LIST, 0)
-        val = RadioSettingValueList(SCANLIST_SELECT_LIST, None, tmpscanl)
-        rs = RadioSetting("slDef", "Default scanlist (SList)", val)
-        scanl.append(rs)
-
-        val = RadioSettingValueBoolean(_mem.sl1PriorEnab)
-        rs = RadioSetting("sl1PriorEnab", "List 1 priority channel scan", val)
-        scanl.append(rs)
-
-        ch_list = ["None"]
-        for ch in range(1, 201):
-            ch_list.append("Channel M%i" % ch)
-
-        tmpch = list_def(_mem.sl1PriorCh1 + 1, ch_list, 0)
-        val = RadioSettingValueList(ch_list, None, tmpch)
-        rs = RadioSetting("sl1PriorCh1", "List 1 priority channel 1", val)
-        scanl.append(rs)
-
-        tmpch = list_def(_mem.sl1PriorCh2 + 1, ch_list, 0)
-        val = RadioSettingValueList(ch_list, None, tmpch)
-        rs = RadioSetting("sl1PriorCh2", "List 1 priority channel 2", val)
-        scanl.append(rs)
-
-        val = RadioSettingValueBoolean(_mem.sl2PriorEnab)
-        rs = RadioSetting("sl2PriorEnab", "List 2 priority channel scan", val)
-        scanl.append(rs)
-
-        tmpch = list_def(_mem.sl2PriorCh1 + 1, ch_list, 0)
-        val = RadioSettingValueList(ch_list, None, tmpch)
-        rs = RadioSetting("sl2PriorCh1", "List 2 priority channel 1", val)
-        scanl.append(rs)
-
-        tmpch = list_def(_mem.sl2PriorCh2 + 1, ch_list, 0)
-        val = RadioSettingValueList(ch_list, None, tmpch)
-        rs = RadioSetting("sl2PriorCh2", "List 2 priority channel 2", val)
-        scanl.append(rs)
+        scanSettingsSubGrp = RadioSettingSubGroup("scanSettingsSubGrp", "Scan Settings")
+        scanl.append(scanSettingsSubGrp)
+        val = RadioSettingValueBoolean(_mem.DefaultScanOnStart)
+        rs = RadioSetting("DefaultScanOnStart", "Start Scanning on Start (Power On)", val)
+        scanSettingsSubGrp.append(rs)
+        scanListsSubGrp = RadioSettingSubGroup("scanListsSubGrp", "Scan Lists")
+        scanl.append(scanListsSubGrp)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList0)
+        rs = RadioSetting("DefaultScanList0", "Scanlist 0", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList1)
+        rs = RadioSetting("DefaultScanList1", "Scanlist 1", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList2)
+        rs = RadioSetting("DefaultScanList2", "Scanlist 2", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList3)
+        rs = RadioSetting("DefaultScanList3", "Scanlist 3", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList4)
+        rs = RadioSetting("DefaultScanList4", "Scanlist 4", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList5)
+        rs = RadioSetting("DefaultScanList5", "Scanlist 5", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList6)
+        rs = RadioSetting("DefaultScanList6", "Scanlist 6", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList7)
+        rs = RadioSetting("DefaultScanList7", "Scanlist 7", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList8)
+        rs = RadioSetting("DefaultScanList8", "Scanlist 8", val)
+        scanListsSubGrp.append(rs)
+        val = RadioSettingValueBoolean(_mem.DefaultScanList9)
+        rs = RadioSetting("DefaultScanList9", "Scanlist 9", val)
+        scanListsSubGrp.append(rs)
 
         # ----------------- Basic settings
 
@@ -1664,8 +1913,7 @@ class UVK5RadioEgzumer(uvk5.UVK5RadioBase):
         bcklSubGrp.append(bl_max_setting)
         bcklSubGrp.append(blt_trx_setting)
 
-        audioSubGrp = RadioSettingSubGroup("audioSubGrp",
-                                           "Audio related settings")
+        audioSubGrp = RadioSettingSubGroup("audioSubGrp", "Audio related settings")
         basic.append(audioSubGrp)
         if _mem.BUILD_OPTIONS.ENABLE_VOX:
             audioSubGrp.append(vox_setting)
