@@ -603,7 +603,7 @@ class UVK5RadioAubs(uvk5.UVK5RadioBase):
             if _mem3.is_free > 0:
                 mem.empty = True
 
-        # Get the Scan Lists for the channel
+            # Get the Scan Lists for the channel
             _mem5 = self._memobj.channelscanlists[mem.number - 1]
             tmpscn = ""
             if _mem5.ScanList0 > 0: tmpscn += "0"
@@ -707,6 +707,10 @@ class UVK5RadioAubs(uvk5.UVK5RadioBase):
         # Get a low-level memory object mapped to the image
         _mem = self._memobj.channel[number]
         _mem4 = self._memobj
+
+        # Get the Scan Lists for the channel
+        _mem5 = self._memobj.channelscanlists[mem.number - 1]
+
         # empty memory
         if mem.empty:
             _mem.set_raw(b"\xFF" * 16)
@@ -717,6 +721,17 @@ class UVK5RadioAubs(uvk5.UVK5RadioBase):
                 _mem4.channel_attributes[number].compander = 0
                 _mem4.channel_attributes[number].is_free = 1
                 _mem4.channel_attributes[number].band = 0x7
+                # Memory is empty, so clear out the ScanLists
+                _mem5.ScanList0 = False
+                _mem5.ScanList1 = False
+                _mem5.ScanList2 = False
+                _mem5.ScanList3 = False
+                _mem5.ScanList4 = False
+                _mem5.ScanList5 = False
+                _mem5.ScanList6 = False
+                _mem5.ScanList7 = False
+                _mem5.ScanList8 = False
+                _mem5.ScanList9 = False
             return mem
         # clean the channel memory, restore some bits if it was used before
         if _mem.get_raw(asbytes=False)[0] == "\xff":
